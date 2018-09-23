@@ -51,9 +51,11 @@ def main(opt):
         checkpoint = torch.load('checkpoints/latest.pt', map_location='cpu')
 
         model.load_state_dict(checkpoint['model'])
+        """	
         if torch.cuda.device_count() > 1:
             print('Using ', torch.cuda.device_count(), ' GPUs')
             model = nn.DataParallel(model)
+        """
         model.to(device).train()
 
         # # Transfer learning
@@ -74,9 +76,11 @@ def main(opt):
 
         del checkpoint  # current, saved
     else:
+        """
         if torch.cuda.device_count() > 1:
             print('Using ', torch.cuda.device_count(), ' GPUs')
             model = nn.DataParallel(model)
+        """
         model.to(device).train()
 
         # Set optimizer
