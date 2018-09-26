@@ -1,5 +1,6 @@
 import argparse
 import time
+import tqdm
 
 from models import *
 from utils.datasets import *
@@ -7,7 +8,7 @@ from utils.utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-epochs', type=int, default=160, help='number of epochs')
-parser.add_argument('-batch_size', type=int, default=12, help='size of each image batch')
+parser.add_argument('-batch_size', type=int, default=16, help='size of each image batch')
 parser.add_argument('-data_config_path', type=str, default='cfg/coco.data', help='data config file path')
 parser.add_argument('-cfg', type=str, default='cfg/yolov3.cfg', help='cfg file path')
 parser.add_argument('-img_size', type=int, default=32 * 13, help='size of each image dimension')
@@ -94,7 +95,7 @@ def main(opt):
     t0, t1 = time.time(), time.time()
     print('%10s' * 16 % (
         'Epoch', 'Batch', 'x', 'y', 'w', 'h', 'conf', 'cls', 'total', 'P', 'R', 'nTargets', 'TP', 'FP', 'FN', 'time'))
-    for epoch in range(opt.epochs):
+    for epoch in tqdm.tqdm(range(opt.epochs),desc="epoch"):
         epoch += start_epoch
 
         # Multi-Scale YOLO Training
@@ -112,7 +113,7 @@ def main(opt):
         ui = -1
         rloss = defaultdict(float)  # running loss
         metrics = torch.zeros(4, num_classes)
-        for i, (imgs, targets) in enumerate(dataloader):
+        for i, (imgs, targets) in tqdm.tqdm(enumerate(dataloader),leave=False):
             if sum([len(x) for x in targets]) < 1:  # if no targets continue
                 continue
 
@@ -158,7 +159,7 @@ def main(opt):
                 rloss['loss'], mean_precision, mean_recall, model.losses['nT'], model.losses['TP'],
                 model.losses['FP'], model.losses['FN'], time.time() - t1)
             t1 = time.time()
-            print(s)
+        print(s)
 
         # Write epoch results
         with open('results.txt', 'a') as file:
