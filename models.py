@@ -119,16 +119,16 @@ class YOLOLayer(nn.Module):
         y = torch.sigmoid(p[..., 1])  # Center y
 
         # Width and height (yolo method)
-        # w = p[..., 2]  # Width
-        # h = p[..., 3]  # Height
-        # width = torch.exp(w.data) * self.anchor_w
-        # height = torch.exp(h.data) * self.anchor_h
+        w = p[..., 2]  # Width
+        h = p[..., 3]  # Height
+        width = torch.exp(w.data) * self.anchor_w
+        height = torch.exp(h.data) * self.anchor_h
 
         # Width and height (power method)
-        w = torch.sigmoid(p[..., 2])  # Width
-        h = torch.sigmoid(p[..., 3])  # Height
-        width = ((w.data * 2) ** 2) * self.anchor_w
-        height = ((h.data * 2) ** 2) * self.anchor_h
+        # w = torch.sigmoid(p[..., 2])  # Width
+        # h = torch.sigmoid(p[..., 3])  # Height
+        # width = ((w.data * 2) ** 2) * self.anchor_w
+        # height = ((h.data * 2) ** 2) * self.anchor_h
 
         # Add offset and scale with anchors (in grid space, i.e. 0-13)
         pred_boxes = FT(bs, self.nA, nG, nG, 4)
@@ -137,9 +137,8 @@ class YOLOLayer(nn.Module):
 
         # Training
         if targets is not None:
-            BCEWithLogitsLoss1 = nn.BCEWithLogitsLoss(size_average=False)
-            BCEWithLogitsLoss2 = nn.BCEWithLogitsLoss(size_average=True)
-            MSELoss = nn.MSELoss(size_average=False)  # version 0.4.0
+            MSELoss = nn.MSELoss(size_average=True)
+            BCEWithLogitsLoss = nn.BCEWithLogitsLoss(size_average=True)
             CrossEntropyLoss = nn.CrossEntropyLoss()
 
             if requestPrecision:
@@ -157,33 +156,38 @@ class YOLOLayer(nn.Module):
             if x.is_cuda:
                 tx, ty, tw, th, mask, tcls = tx.cuda(), ty.cuda(), tw.cuda(), th.cuda(), mask.cuda(), tcls.cuda()
 
-                # Mask outputs to ignore non-existing objects (but keep confidence predictions)
-                nT = sum([len(x) for x in targets])  # number of targets
-                nM = mask.sum().float()  # number of anchors (assigned to targets)
-                nB = len(targets)  # batch size
-                if nM > 0:
-                    lx = (5 / nB) * MSELoss(x[mask], tx[mask])
-                    ly = (5 / nB) * MSELoss(y[mask], ty[mask])
-                    lw = (5 / nB) * MSELoss(w[mask], tw[mask])
-                    lh = (5 / nB) * MSELoss(h[mask], th[mask])
-                    lconf = (1 / nB) * BCEWithLogitsLoss1(pred_conf[mask], mask[mask].float())
+            # Mask outputs to ignore non-existing objects (but keep confidence predictions)
+            nT = sum([len(x) for x in targets])  # number of targets
+            nM = mask.sum().float()  # number of anchors (assigned to targets)
+            nB = len(targets)  # batch size
+            k = nM / nB
+            if nM > 0:
+                lx = k * MSELoss(x[mask], tx[mask])
+                ly = k * MSELoss(y[mask], ty[mask])
+                lw = k * MSELoss(w[mask], tw[mask])
+                lh = k * MSELoss(h[mask], th[mask])
 
-                    lcls = (1 * nM / nB) * CrossEntropyLoss(pred_cls[mask], torch.argmax(tcls, 1))
-                    # lcls = (1 * nM / nB) * BCEWithLogitsLoss2(pred_cls[mask], tcls.float())
-                else:
-                    lx, ly, lw, lh, lcls, lconf = FT([0]), FT([0]), FT([0]), FT([0]), FT([0]), FT([0])
+                # lconf = k * BCEWithLogitsLoss(pred_conf[mask], mask[mask].float())
+                lconf = k * BCEWithLogitsLoss(pred_conf, mask.float())
 
-                lconf += (0.5 * nM / nB) * BCEWithLogitsLoss2(pred_conf[~mask], mask[~mask].float())
+                lcls = k * CrossEntropyLoss(pred_cls[mask], torch.argmax(tcls, 1))
+                # lcls = k * BCEWithLogitsLoss(pred_cls[mask], tcls.float())
+            else:
+                lx, ly, lw, lh, lcls, lconf = FT([0]), FT([0]), FT([0]), FT([0]), FT([0]), FT([0])
 
-                loss = lx + ly + lw + lh + lconf + lcls
+            # Add confidence loss for background anchors (noobj)
+            #lconf += k * BCEWithLogitsLoss(pred_conf[~mask], mask[~mask].float())
 
-            # Sum False Positives from unnasigned anchors
-            i = torch.sigmoid(pred_conf[~mask]) > 0.99
-            FPe = torch.zeros(self.nC)
+            # Sum loss components
+            loss = lx + ly + lw + lh + lconf + lcls
+
+            # Sum False Positives from unassigned anchors
+            i = torch.sigmoid(pred_conf[~mask]) > 0.9
             if i.sum() > 0:
                 FP_classes = torch.argmax(pred_cls[~mask][i], 1)
-                for c in FP_classes:
-                    FPe[c] += 1
+                FPe = torch.bincount(FP_classes, minlength=self.nC).float().cpu()  # extra FPs
+            else:
+                FPe = torch.zeros(self.nC)
 
             return loss, loss.item(), lx.item(), ly.item(), lw.item(), lh.item(), lconf.item(), lcls.item(), \
                    nT, TP, FP, FPe, FN, TC

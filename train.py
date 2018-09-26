@@ -6,7 +6,7 @@ from utils.datasets import *
 from utils.utils import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-epochs', type=int, default=160, help='number of epochs')
+parser.add_argument('-epochs', type=int, default=68, help='number of epochs')
 parser.add_argument('-batch_size', type=int, default=12, help='size of each image batch')
 parser.add_argument('-data_config_path', type=str, default='cfg/coco.data', help='data config file path')
 parser.add_argument('-cfg', type=str, default='cfg/yolov3.cfg', help='cfg file path')
@@ -44,11 +44,11 @@ def main(opt):
     # Get dataloader
     dataloader = load_images_and_labels(train_path, batch_size=opt.batch_size, img_size=opt.img_size, augment=True)
 
-    # reload saved optimizer state
+    # Reload saved optimizer state
     start_epoch = 0
     best_loss = float('inf')
     if opt.resume:
-        checkpoint = torch.load('checkpoints/latest.pt', map_location='cpu')
+        checkpoint = torch.load('checkpoints/yolov3.pt', map_location='cpu')
 
         model.load_state_dict(checkpoint['model'])
         if torch.cuda.device_count() > 1:
@@ -66,11 +66,13 @@ def main(opt):
 
         # Set optimizer
         # optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()))
-        optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()))
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3,
+                                    momentum=.9, weight_decay=5e-4, nesterov=True)
 
         start_epoch = checkpoint['epoch'] + 1
-        best_loss = checkpoint['best_loss']
+        if checkpoint['optimizer'] is not None:
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            best_loss = checkpoint['best_loss']
 
         del checkpoint  # current, saved
     else:
@@ -84,7 +86,7 @@ def main(opt):
         optimizer = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=.9, weight_decay=5e-4, nesterov=True)
 
     # Set scheduler
-    # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99082, last_epoch=start_epoch - 1)
+    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[54, 61], gamma=0.1)
 
     modelinfo(model)
     t0, t1 = time.time(), time.time()
@@ -102,8 +104,14 @@ def main(opt):
         # scheduler.step()
 
         # Update scheduler (manual)
-        # for g in optimizer.param_groups:
-        #     g['lr'] = 1e-3 * (g ** epoch)  # 1/10th every [30, 50, 100, 250] epochs using g = [.926, .955, .977, .992]
+        if epoch < 54:
+            lr = 1e-3
+        elif epoch < 61:
+            lr = 1e-4
+        else:
+            lr = 1e-5
+        for g in optimizer.param_groups:
+            g['lr'] = lr
 
         ui = -1
         rloss = defaultdict(float)  # running loss
@@ -114,11 +122,9 @@ def main(opt):
 
             # SGD burn-in
             if (epoch == 0) & (i <= 1000):
-                power = 4
-                lr = 1e-3 * (i / 1000) ** power
+                lr = 1e-3 * (i / 1000) ** 4
                 for g in optimizer.param_groups:
                     g['lr'] = lr
-                # print('SGD Burn-In LR = %9.5g' % lr, end='')
 
             # Compute loss, compute gradient, update parameters
             loss = model(imgs.to(device), targets, requestPrecision=True)

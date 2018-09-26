@@ -263,13 +263,13 @@ def build_targets(pred_boxes, pred_conf, pred_cls, target, anchor_wh, nA, nC, nG
         tx[b, a, gj, gi] = gx - gi.float()
         ty[b, a, gj, gi] = gy - gj.float()
 
-        # Width and height (power method)
-        tw[b, a, gj, gi] = torch.sqrt(gw / anchor_wh[a, 0]) / 2
-        th[b, a, gj, gi] = torch.sqrt(gh / anchor_wh[a, 1]) / 2
+        # Width and height (yolo method)
+        tw[b, a, gj, gi] = torch.log(gw / anchor_wh[a, 0] + 1e-16)
+        th[b, a, gj, gi] = torch.log(gh / anchor_wh[a, 1] + 1e-16)
 
-        # Width and height (yolov3 method)
-        # tw[b, a, gj, gi] = torch.log(gw / anchor_wh[a, 0] + 1e-16)
-        # th[b, a, gj, gi] = torch.log(gh / anchor_wh[a, 1] + 1e-16)
+        # Width and height (power method)
+        # tw[b, a, gj, gi] = torch.sqrt(gw / anchor_wh[a, 0]) / 2
+        # th[b, a, gj, gi] = torch.sqrt(gh / anchor_wh[a, 1]) / 2
 
         # One-hot encoding of label
         tcls[b, a, gj, gi, tc] = 1
@@ -282,9 +282,9 @@ def build_targets(pred_boxes, pred_conf, pred_cls, target, anchor_wh, nA, nC, nG
             pconf = torch.sigmoid(pred_conf[b, a, gj, gi]).cpu()
             iou_pred = bbox_iou(tb, pred_boxes[b, a, gj, gi].cpu())
 
-            TP[b, i] = (pconf > 0.99) & (iou_pred > 0.5) & (pcls == tc)
-            FP[b, i] = (pconf > 0.99) & (TP[b, i] == 0)  # coordinates or class are wrong
-            FN[b, i] = pconf <= 0.99  # confidence score is too low (set to zero)
+            TP[b, i] = (pconf > 0.9) & (iou_pred > 0.5) & (pcls == tc)
+            FP[b, i] = (pconf > 0.9) & (TP[b, i] == 0)  # coordinates or class are wrong
+            FN[b, i] = pconf <= 0.9  # confidence score is too low (set to zero)
 
     return tx, ty, tw, th, tconf, tcls, TP, FP, FN, TC
 
@@ -429,8 +429,8 @@ def plotResults():
     import matplotlib.pyplot as plt
     plt.figure(figsize=(16, 8))
     s = ['X', 'Y', 'Width', 'Height', 'Objectness', 'Classification', 'Total Loss', 'Precision', 'Recall']
-    for f in ('/Users/glennjocher/Downloads/results_CE.txt',
-              '/Users/glennjocher/Downloads/results_BCE.txt'):
+    for f in ('results.txt',
+              ):
         results = np.loadtxt(f, usecols=[2, 3, 4, 5, 6, 7, 8, 9, 10]).T
         for i in range(9):
             plt.subplot(2, 5, i + 1)
