@@ -163,6 +163,7 @@ def bbox_iou(box1, box2, x1y1x2y2=True):
     """
     Returns the IoU of two bounding boxes
     """
+    box2 = box2
     if x1y1x2y2:
         # Get the coordinates of bounding boxes
         b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
@@ -221,6 +222,7 @@ def build_targets(pred_boxes, pred_conf, pred_cls, target, anchor_wh, nA, nC, nG
         # iou of targets-anchors (using wh only)
         box1 = t[:, 3:5] * nG
         # box2 = anchor_grid_wh[:, gj, gi]
+        # box2 = anchor_wh.unsqueeze(1).repeat(1, nTb, 1)
         box2 = anchor_wh.unsqueeze(1).repeat(1, nTb, 1)
         inter_area = torch.min(box1, box2).prod(2)
         iou_anch = inter_area / (gw * gh + box2.prod(2) - inter_area + 1e-16)
@@ -260,8 +262,8 @@ def build_targets(pred_boxes, pred_conf, pred_cls, target, anchor_wh, nA, nC, nG
         tc, gx, gy, gw, gh = t[:, 0].long(), t[:, 1] * nG, t[:, 2] * nG, t[:, 3] * nG, t[:, 4] * nG
 
         # Coordinates
-        tx[b, a, gj, gi] = gx - gi.float()
-        ty[b, a, gj, gi] = gy - gj.float()
+        tx[b, a, gj, gi] = (gx - gi.float())
+        ty[b, a, gj, gi] = (gy - gj.float())
 
         # Width and height (yolo method)
         tw[b, a, gj, gi] = torch.log(gw / anchor_wh[a, 0] + 1e-16)

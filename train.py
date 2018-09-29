@@ -1,5 +1,6 @@
 import argparse
 import time
+import tqdm
 
 from models import *
 from utils.datasets import *
@@ -48,12 +49,15 @@ def main(opt):
     start_epoch = 0
     best_loss = float('inf')
     if opt.resume:
-        checkpoint = torch.load('checkpoints/yolov3.pt', map_location='cpu')
+        #checkpoint = torch.load('checkpoints/yolov3.pt', map_location='cpu')
+        checkpoint = torch.load('checkpoints/latest.pt', map_location='cpu')
 
         model.load_state_dict(checkpoint['model'])
+        """
         if torch.cuda.device_count() > 1:
             print('Using ', torch.cuda.device_count(), ' GPUs')
             model = nn.DataParallel(model)
+        """
         model.to(device).train()
 
         # # Transfer learning
@@ -76,9 +80,11 @@ def main(opt):
 
         del checkpoint  # current, saved
     else:
+        """
         if torch.cuda.device_count() > 1:
             print('Using ', torch.cuda.device_count(), ' GPUs')
             model = nn.DataParallel(model)
+        """
         model.to(device).train()
 
         # Set optimizer
@@ -116,7 +122,7 @@ def main(opt):
         ui = -1
         rloss = defaultdict(float)  # running loss
         metrics = torch.zeros(4, num_classes)
-        for i, (imgs, targets) in enumerate(dataloader):
+        for i, (imgs, targets) in tqdm.tqdm(enumerate(dataloader)):
             if sum([len(x) for x in targets]) < 1:  # if no targets continue
                 continue
 
@@ -160,7 +166,7 @@ def main(opt):
                 rloss['loss'], mean_precision, mean_recall, model.losses['nT'], model.losses['TP'],
                 model.losses['FP'], model.losses['FN'], time.time() - t1)
             t1 = time.time()
-            print(s)
+        print(s)
 
         # Write epoch results
         with open('results.txt', 'a') as file:
