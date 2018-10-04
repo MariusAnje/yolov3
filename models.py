@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from utils.parse_config import *
 from utils.utils import *
+from SampleNN import mSample
 
 
 def create_modules(module_defs):
@@ -31,10 +32,12 @@ def create_modules(module_defs):
                 modules.add_module('batch_norm_%d' % i, nn.BatchNorm2d(filters))
             if module_def['activation'] == 'leaky':
                 modules.add_module('leaky_%d' % i, nn.LeakyReLU(0.1))
+            modules.add_module('quan_%d' % i, mSample(N=8,m=3))
 
         elif module_def['type'] == 'upsample':
             upsample = nn.Upsample(scale_factor=int(module_def['stride']), mode='nearest')
             modules.add_module('upsample_%d' % i, upsample)
+            modules.add_module('quan_%d' % i, mSample(N=8,m=3))
 
         elif module_def['type'] == 'route':
             layers = [int(x) for x in module_def['layers'].split(',')]
@@ -56,6 +59,7 @@ def create_modules(module_defs):
             # Define detection layer
             yolo_layer = YOLOLayer(anchors, num_classes, img_height, anchor_idxs)
             modules.add_module('yolo_%d' % i, yolo_layer)
+            modules.add_module('quan_%d' % i, mSample(N=10,m=1))
 
         # Register module list and number of output filters
         module_list.append(modules)

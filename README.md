@@ -61,3 +61,9 @@ Run `test.py -weights_path checkpoints/latest.pt` to validate against the latest
 # Contact
 
 For questions or comments please contact Glenn Jocher at glenn.jocher@ultralytics.com or visit us at http://www.ultralytics.com/contact
+
+# Marius Anje
+
+Trying to add Quantization methods to yolo
+
+The yolo layer is not convolutional nor activation, it should not be quantizised and perhaps should be calculated in CPU
