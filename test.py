@@ -1,4 +1,5 @@
 import argparse
+import tqdm
 from models import *
 from utils.datasets import *
 from utils.utils import *
@@ -12,13 +13,12 @@ parser.add_argument('-class_path', type=str, default='data/coco.names', help='pa
 parser.add_argument('-iou_thres', type=float, default=0.5, help='iou threshold required to qualify as detected')
 parser.add_argument('-conf_thres', type=float, default=0.5, help='object confidence threshold')
 parser.add_argument('-nms_thres', type=float, default=0.45, help='iou threshold for non-maximum suppression')
-parser.add_argument('-n_cpu', type=int, default=0, help='number of cpu threads to use during batch generation')
+parser.add_argument('-n_cpu', type=int, default=4, help='number of cpu threads to use during batch generation')
 parser.add_argument('-img_size', type=int, default=416, help='size of each image dimension')
-parser.add_argument('-use_cuda', type=bool, default=True, help='whether to use cuda if available')
 opt = parser.parse_args()
 print(opt)
 
-cuda = torch.cuda.is_available() and opt.use_cuda
+cuda = torch.cuda.is_available()
 device = torch.device('cuda:0' if cuda else 'cpu')
 
 # Configure run
@@ -52,7 +52,7 @@ print('Compute mAP...')
 correct = 0
 targets = None
 outputs, mAPs, TP, confidence, pred_class, target_class = [], [], [], [], [], []
-for batch_i, (imgs, targets) in enumerate(dataloader):
+for batch_i, (imgs, targets) in tqdm.tqdm(enumerate(dataloader),desc="Total %d batches"%(len(dataloader)), leave = False):
     imgs = imgs.to(device)
 
     with torch.no_grad():
@@ -115,6 +115,6 @@ for batch_i, (imgs, targets) in enumerate(dataloader):
         mAPs.append(mAP)
 
         # Print image mAP and running mean mAP
-        print('+ Sample [%d/%d] AP: %.4f (%.4f)' % (len(mAPs), len(dataloader) * opt.batch_size, mAP, np.mean(mAPs)))
+        # print('+ Sample [%d/%d] AP: %.4f (%.4f)' % (len(mAPs), len(dataloader) * opt.batch_size, mAP, np.mean(mAPs)))
 
 print('Mean Average Precision: %.4f' % np.mean(mAPs))
