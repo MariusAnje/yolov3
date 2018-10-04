@@ -98,7 +98,7 @@ def main(opt):
     t0, t1 = time.time(), time.time()
     print('%10s' * 16 % (
         'Epoch', 'Batch', 'x', 'y', 'w', 'h', 'conf', 'cls', 'total', 'P', 'R', 'nTargets', 'TP', 'FP', 'FN', 'time'))
-    for epoch in range(opt.epochs):
+    for epoch in tqdm.tqdm(range(opt.epochs),desc="epoch"):
         epoch += start_epoch
 
         # Multi-Scale YOLO Training
@@ -122,7 +122,7 @@ def main(opt):
         ui = -1
         rloss = defaultdict(float)  # running loss
         metrics = torch.zeros(4, num_classes)
-        for i, (imgs, targets) in tqdm.tqdm(enumerate(dataloader)):
+        for i, (imgs, targets) in tqdm.tqdm(enumerate(dataloader),leave=False):
             if sum([len(x) for x in targets]) < 1:  # if no targets continue
                 continue
 
