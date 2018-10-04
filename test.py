@@ -52,7 +52,7 @@ print('Compute mAP...')
 correct = 0
 targets = None
 outputs, mAPs, TP, confidence, pred_class, target_class = [], [], [], [], [], []
-for batch_i, (imgs, targets) in tqdm.tqdm(enumerate(dataloader),desc="Total %d batches"%(len(dataloader)), leave = False):
+for batch_i, (imgs, targets) in tqdm.tqdm(enumerate(dataloader),total=len(dataloader), leave = False):
     imgs = imgs.to(device)
 
     with torch.no_grad():
@@ -115,6 +115,6 @@ for batch_i, (imgs, targets) in tqdm.tqdm(enumerate(dataloader),desc="Total %d b
         mAPs.append(mAP)
 
         # Print image mAP and running mean mAP
-        # print('+ Sample [%d/%d] AP: %.4f (%.4f)' % (len(mAPs), len(dataloader) * opt.batch_size, mAP, np.mean(mAPs)))
+        print('+ Sample [%d/%d] AP: %.4f (%.4f)' % (len(mAPs), len(dataloader) * opt.batch_size, mAP, np.mean(mAPs)))
 
 print('Mean Average Precision: %.4f' % np.mean(mAPs))
